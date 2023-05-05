@@ -4,8 +4,8 @@
 
 #define MAX_COMMAND_LENGTH 20
 #define MAX_VALUE_LENGTH 20
-#define MAX_POKEMONS 1000
-#define MAX_NAME_LEN 50
+#define MAX_POKEMONS 2000
+#define MAX_NAME_LEN 200
 
 typedef struct {
     int id;
@@ -29,10 +29,18 @@ typedef struct {
 } PokemonDB;
 
 PokemonDB pokemon_db = {0};
+
 Pokemon** matching_pokemons = NULL;
 int matching_pokemon_count = 0;
 
+void clear_db(PokemonDB* db)
+{
+    memset(db->pokemons, 0, sizeof(db->pokemons)); //clear the memory reserved by the array 
+    db->count = 0; //Reset the count
+}
+
 void print_pokemon(Pokemon p) {
+    //printf("\t| ID: %d | Name: %s | Form: %s |", p.id, p.name, p.form);
     printf("\tID: %d\n", p.id);
     printf("\tName: %s\n", p.name);
     printf("\tForm: %s\n", p.form);
@@ -120,7 +128,14 @@ void load_command(char* filename)
     char line[1000];
     fgets(line, 1000, fp); // skip header line
 
+    clear_db(&pokemon_db); //clear db before starting to store new records
+
     while (fgets(line, 1000, fp)) {
+
+        if (pokemon_db.count >= MAX_POKEMONS) {
+            printf("Warning: DB max capacity reached, to load the entire file increas MAX_POKEMONS variable.\n");
+            break;
+        }
 
         char* token = strtok(line, &delimiter);
         pokemon_db.pokemons[pokemon_db.count].id = atoi(token); 
@@ -162,7 +177,7 @@ void load_command(char* filename)
         pokemon_db.pokemons[pokemon_db.count].generation = atoi(token); 
 
         pokemon_db.count++;
-    }
+    }    
 
     fclose(fp);
     printf("Loaded %d pokemons from file %s\n", pokemon_db.count, filename);
@@ -173,7 +188,7 @@ void size_command() {
 }
 
 void range_command(int range) {
-    printf("Getting range: %d\n", range);
+    printf("Getting range: %d\n\n", range);
 
     if (range > pokemon_db.count) {
         range = pokemon_db.count;
