@@ -2,17 +2,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_COMMAND_LENGTH 30
-#define MAX_VALUE_LENGTH 30
-#define POKEMONS_INIT_CAPACITY 2000
-#define MAX_NAME_LEN 1000
+/***************************************************************************
+* Class Pokemon
+****************************************************************************/
+#define POKEMON_MAX_NAME_LEN 100
 
-typedef struct {
+typedef struct Pokemon Pokemon;
+
+struct Pokemon
+{
     int id;
-    char name[MAX_NAME_LEN];
-    char form[MAX_NAME_LEN];
-    char type1[MAX_NAME_LEN];
-    char type2[MAX_NAME_LEN];
+    char name[POKEMON_MAX_NAME_LEN];
+    char form[POKEMON_MAX_NAME_LEN];
+    char type1[POKEMON_MAX_NAME_LEN];
+    char type2[POKEMON_MAX_NAME_LEN];
     int total;
     int hp;
     int attack;
@@ -21,161 +24,285 @@ typedef struct {
     int sp_def;
     int speed;
     int generation;
-} Pokemon;
+};
 
-typedef struct {
-    Pokemon* pokemons;  // Dynamic array of Pokemon
+// Pokemon *Pokemon_new();
+// void Pokemon__destroy(Pokemon *self);
+// void Pokemon_init_from_str(Pokemon *self, char *str);
+// void Pokemon_print_multi_line(Pokemon *self);
+// void Pokemon_print_one_line(Pokemon *self);
+// char* Pokemon_to_string_csv(Pokemon *self, char *buffer);
+
+
+// Allocation + initialization (equivalent to "new Pokemon")
+Pokemon *Pokemon_new()
+{
+    Pokemon *result = (Pokemon *) malloc(sizeof(Pokemon));
+    return result;
+}
+
+void Pokemon_init(Pokemon *self, int id, const char* name, const char* form, const char* type1, const char* type2, int total, int hp, int attack, int defense, int sp_atk, int sp_def, int speed, int generation)
+{
+    self->id = id;
+    
+    strncpy(self->name, name, sizeof(self->name) - 1);
+    // the above line copy a string but without overflow the char array size,
+    // thats the reason why we have the next line, a string needs to be terminated, 
+    // the \0 char represents the end of a string
+    self->name[sizeof(self->name) - 1] = '\0';
+
+    strncpy(self->form, form, sizeof(self->form) - 1);
+    self->form[sizeof(self->form) - 1] = '\0';
+
+    strncpy(self->type1, type1, sizeof(self->type1) - 1);
+    self->type1[sizeof(self->type1) - 1] = '\0';
+
+    strncpy(self->type2, type2, sizeof(self->type2) - 1);
+    self->type2[sizeof(self->type2) - 1] = '\0';
+
+    self->total = total;
+    self->hp = hp;
+    self->attack = attack;
+    self->defense = defense;
+    self->sp_atk = sp_atk;
+    self->sp_def = sp_def;
+    self->speed = speed;
+    self->generation = generation;
+}
+
+void Pokemon_init_from_str(Pokemon *self, char* str)
+{
+    const char delimiter[2] = ",";
+
+    Pokemon_init(
+        self, 
+        atoi(strtok(str, delimiter)), //id
+        strtok(NULL, delimiter), //name
+        strtok(NULL, delimiter), //form
+        strtok(NULL, delimiter), //type1
+        strtok(NULL, delimiter), //type2
+        atoi(strtok(NULL, delimiter)), //total
+        atoi(strtok(NULL, delimiter)), //hp
+        atoi(strtok(NULL, delimiter)), //attack
+        atoi(strtok(NULL, delimiter)), //defense
+        atoi(strtok(NULL, delimiter)), //sp_atk
+        atoi(strtok(NULL, delimiter)), //sp_def
+        atoi(strtok(NULL, delimiter)), //speed
+        atoi(strtok(NULL, delimiter)) //gen
+    );
+}
+
+// Destructor (without deallocation)
+void Pokemon_reset(Pokemon *self)
+{
+    // Set all fields to their default value
+    self->id = 0;
+    
+    memset(self->name, 0, sizeof(self->name));
+    memset(self->form, 0, sizeof(self->form));
+    memset(self->type1, 0, sizeof(self->type1));
+    memset(self->type2, 0, sizeof(self->type2));
+
+    self->total = 0;
+    self->hp = 0;
+    self->attack = 0;
+    self->defense = 0;
+    self->sp_atk = 0;
+    self->sp_def = 0;
+    self->speed = 0;
+    self->generation = 0;
+}
+
+// Destructor + deallocation (equivalent to "delete pokemon")
+void Pokemon_destroy(Pokemon *self)
+{
+    if (self) {
+        Pokemon_reset(self);
+        free(self);
+    }
+}
+
+void Pokemon_print_multi_line(Pokemon *self)
+{
+    printf("-----------------------\n");
+    printf("| ID: %16d |\n", self->id);
+    printf("| Name: %14s |\n", self->name);
+    printf("| Form: %14s |\n", self->form);
+    printf("| Type 1: %12s |\n", self->type1);
+    printf("| Type 2: %12s |\n", self->type2);
+    printf("| Total: %13d |\n", self->total);
+    printf("| HP: %16d |\n", self->hp);
+    printf("| Attack: %12d |\n", self->attack);
+    printf("| Defense: %11d |\n", self->defense);
+    printf("| Sp. Atk: %11d |\n", self->sp_atk);
+    printf("| Sp. Def: %11d |\n", self->sp_def);
+    printf("| Speed: %13d |\n", self->speed);
+    printf("| Generation: %8d |\n", self->generation);
+    printf("-----------------------\n");
+}
+
+void Pokemon_print_one_line(Pokemon *self)
+{
+    printf("| %-4d | %-20s | %-24s | %-10s | %-10s | %5d | %4d | %6d | %7d | %7d | %7d | %5d | %3d |\n", self->id, self->name, self->form, self->type1, self->type2, self->total, self->hp, self->attack, self->defense, self->sp_atk, self->sp_def, self->speed, self->generation);
+}
+
+void Pokemon_to_string_csv(Pokemon *self, FILE *buffer)
+{
+    snprintf(buffer, sizeof buffer, "%d,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d\n",self->id, self->name, self->form, self->type1, self->type2, self->total, self->hp, self->attack, self->defense, self->sp_atk, self->sp_def, self->speed, self->generation);
+}
+
+int Pokemon_match_stat(Pokemon *self, char *field_name, char *field_value)
+{
+    if (strcmp(field_name, "ID") == 0 && atoi(field_value) == self->id) {
+        return 1;
+    } else if (strcmp(field_name, "Name") == 0 && strcmp(field_value, self->name) == 0) {
+        return 1;
+    } else if (strcmp(field_name, "Form") == 0 && strcmp(field_value, self->form) == 0) {
+        return 1;
+    } else if (strcmp(field_name, "Type1") == 0 && strcmp(field_value, self->type1) == 0) {
+        return 1;
+    } else if (strcmp(field_name, "Type2") == 0 && strcmp(field_value, self->type2) == 0) {
+        return 1;
+    } else if (strcmp(field_name, "Total") == 0 && atoi(field_value) == self->total) {
+        return 1;
+    } else if (strcmp(field_name, "HP") == 0 && atoi(field_value) == self->hp) {
+        return 1;
+    } else if (strcmp(field_name, "Attack") == 0 && atoi(field_value) == self->attack) {
+        return 1;
+    } else if (strcmp(field_name, "Defense") == 0 && atoi(field_value) == self->defense) {
+        return 1;
+    } else if (strcmp(field_name, "Sp. Atk") == 0 && atoi(field_value) == self->sp_atk) {
+        return 1;
+    } else if (strcmp(field_name, "Sp. Def") == 0 && atoi(field_value) == self->sp_def) {
+        return 1;
+    } else if (strcmp(field_name, "Speed") == 0 && atoi(field_value) == self->speed) {
+        return 1;
+    } else if (strcmp(field_name, "Generation") == 0 && atoi(field_value) == self->generation) {
+        return 1;
+    }
+
+    return 0;
+}
+
+/***************************************************************************
+* Class PokemonList
+****************************************************************************/
+#define POKEMONS_LIST_INIT_CAPACITY 100
+
+typedef struct PokemonList PokemonList;
+
+struct PokemonList {
+    Pokemon** pokemons;  // Dynamic array of Pokemon
     int count;          // Number of Pokemon in the database
     int capacity;       // Current capacity of the dynamic array
-} PokemonDB;
+};
 
-PokemonDB* pokemon_db = NULL;
-
-Pokemon** matching_pokemons = NULL;
-int matching_pokemon_count = 0;
-
-void clear_pokemon_db(PokemonDB* db)
+PokemonList* PokemonList_new() 
 {
-    memset(db->pokemons, 0, sizeof(db->pokemons)); //clear the memory reserved by the array 
-    db->count = 0; //Reset the count
+    PokemonList* list = malloc(sizeof(PokemonList));
+    list->count = 0;
+    list->capacity = POKEMONS_LIST_INIT_CAPACITY;
+    list->pokemons = malloc(sizeof(Pokemon) * list->capacity);
+    return list;
 }
 
-PokemonDB* create_pokemon_db(int capacity)
+void PokemonList_destroy(PokemonList* self) 
 {
-    PokemonDB* db = malloc(sizeof(PokemonDB));
-    if (db == NULL) {
-        printf("Error: could not allocate memory for Pokemon DB\n");
-        return NULL;
+    for (int i = 0; i < self->count; i++) {
+        Pokemon_destroy(self->pokemons[i]);
     }
-
-    db->pokemons = malloc(capacity * sizeof(Pokemon));
-    if (db->pokemons == NULL) {
-        printf("Error: could not allocate memory for Pokemon DB\n");
-        free(db);
-        return NULL;
-    }
-
-    db->count = 0;
-    db->capacity = capacity;
-
-    return db;
+    free(self->pokemons);
+    free(self);
 }
 
-void destroy_pokemon_db(PokemonDB* pokemon_db)
+void PokemonList_add(PokemonList* self, Pokemon *pokemon)
 {
-    if (pokemon_db == NULL) {
+    if (self->count == self->capacity) {
+        // If the list is full, resize the dynamic array
+        self->capacity *= 2;
+        self->pokemons = realloc(self->pokemons, sizeof(Pokemon) * self->capacity);
+    }
+    
+    // Add the Pokemon to the list and increment the count
+    self->pokemons[self->count] = pokemon;
+    self->count++;
+}
+
+void PokemonList_remove(PokemonList* self, int index) 
+{
+    // Check if the index is out of bounds
+    if (index >= self->count || index < 0) {
         return;
     }
 
-    // Free each dynamically allocated Pokemon struct
-    for (int i = 0; i < pokemon_db->count; i++) {
-        free(pokemon_db->pokemons[i].name);
-        free(pokemon_db->pokemons[i].form);
-        free(pokemon_db->pokemons[i].type1);
-        free(pokemon_db->pokemons[i].type2);
+    // Free the memory allocated for the Pokemon
+    Pokemon_reset(self->pokemons[index]); 
+
+    // Shift the elements to the left to fill the gap
+    for (int i = index; i < self->count - 1; i++) {
+        self->pokemons[i] = self->pokemons[i+1];
     }
 
-    // Free the dynamically allocated array of Pokemon structs
-    free(pokemon_db->pokemons);
-
-    // Free the PokemonDB struct itself
-    free(pokemon_db);
+    // Clear the memory of the last element
+    // Decrement the count
+    Pokemon_reset(self->pokemons[self->count - 1]); 
+    self->count--; 
 }
 
-void print_pokemon_table_header()
+void PokemonList_clear(PokemonList *self)
+{
+    // Clear the memory of each pokemon entry, memory is still reserved 
+    for (int i = 0; i < self->count; i++) {
+        Pokemon_reset(self->pokemons[i]);
+    }
+
+    // Reset the count
+    self->count = 0;
+
+    // Resize the dynamic array to the initial capacity
+    self->capacity = POKEMONS_LIST_INIT_CAPACITY;
+    self->pokemons = realloc(self->pokemons, sizeof(Pokemon) * self->capacity);
+}
+
+void PokemonList_print_as_table(PokemonList *self, int range)
 {
     printf("| %-4s | %-20s | %-24s | %-10s | %-10s | %-5s | %-4s | %-6s | %-7s | %-7s | %-7s | %-5s | %-3s |\n", "ID","Name","Form","Type 1","Type 2","Total","HP","Attack","Defense","Sp. Atk","Sp. Def","Speed","Gen");
     printf("--------------------------------------------------------------------------------------------------------------------------------------------------------\n");
-}
 
-void print_pokemon_as_table_entry(Pokemon p)
-{
-    printf("| %-4d | %-20s | %-24s | %-10s | %-10s | %5d | %4d | %6d | %7d | %7d | %7d | %5d | %3d |\n",
-             p.id, p.name, p.form, p.type1, p.type2, p.total, p.hp, p.attack, p.defense, p.sp_atk, p.sp_def, p.speed, p.generation);
-}
-
-void print_pokemon_as_object(Pokemon p)
-{
-    printf("-----------------------\n");
-    printf("| ID: %16d|\n", p.id);
-    printf("| Name: %14s|\n", p.name);
-    printf("| Form: %14s|\n", p.form);
-    printf("| Type 1: %12s|\n", p.type1);
-    printf("| Type 2: %12s|\n", p.type2);
-    printf("| Total: %13d|\n", p.total);
-    printf("| HP: %16d|\n", p.hp);
-    printf("| Attack: %12d|\n", p.attack);
-    printf("| Defense: %11d|\n", p.defense);
-    printf("| Sp. Atk: %11d|\n", p.sp_atk);
-    printf("| Sp. Def: %11d|\n", p.sp_def);
-    printf("| Speed: %13d|\n", p.speed);
-    printf("| Generation: %8d|\n", p.generation);
-    printf("-----------------------\n");
-}
-
-Pokemon* find_pokemon_by_id(int id)
-{
-    for (int i = 0; i < pokemon_db->count; i++) {
-        if (pokemon_db->pokemons[i].id == id) {
-            return &pokemon_db->pokemons[i];
-        }
+    if (range < 0 || range > self->count) {
+        range = self->count;
     }
 
-    return NULL;
-}
-
-Pokemon** find_pokemon_by_field(char* field_name, char* field_value, int* count)
-{
-    Pokemon** matching_pokemons = (Pokemon**)malloc(pokemon_db->count * sizeof(Pokemon*));
-    *count = 0;
-    for (int i = 0; i < pokemon_db->count; i++) {
-        Pokemon* p = &pokemon_db->pokemons[i];
-        if (strcmp(field_name, "ID") == 0 && atoi(field_value) == p->id) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "Name") == 0 && strcmp(field_value, p->name) == 0) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "Form") == 0 && strcmp(field_value, p->form) == 0) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "Type1") == 0 && strcmp(field_value, p->type1) == 0) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "Type2") == 0 && strcmp(field_value, p->type2) == 0) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "Total") == 0 && atoi(field_value) == p->total) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "HP") == 0 && atoi(field_value) == p->hp) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "Attack") == 0 && atoi(field_value) == p->attack) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "Defense") == 0 && atoi(field_value) == p->defense) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "Sp. Atk") == 0 && atoi(field_value) == p->sp_atk) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "Sp. Def") == 0 && atoi(field_value) == p->sp_def) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "Speed") == 0 && atoi(field_value) == p->speed) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        } else if (strcmp(field_name, "Generation") == 0 && atoi(field_value) == p->generation) {
-            matching_pokemons[*count] = p;
-            (*count)++;
-        }
+    for (int i = 0; i < range; i++) {
+        Pokemon_print_one_line(self->pokemons[i]);
     }
-    return matching_pokemons;
 }
 
-void load_command(char* filename)
+void PokemonList_save_as_csv(PokemonList *self, char* filename)
 {
+    FILE* filePointer = fopen(filename, "w"); // Open file for writing
+
+    if (filePointer == NULL) {
+        printf("Error: Failed to open file '%s' for writing.\n", filename);
+        return;
+    }
+
+    // Write header row
+    fprintf(filePointer, "\"ID\",\"Name\",\"Form\",\"Type1\",\"Type2\",\"Total\",\"HP\",\"Attack\",\"Defense\",\"Sp. Atk\",\"Sp. Def\",\"Speed\",\"Generation\"\n");
+
+    // Write each matching Pokemon as a row in the CSV file
+    for (int i = 0; i < self->count; i++) {
+        Pokemon_to_string_csv(self->pokemons[i], filePointer);
+    }
+
+    fclose(filePointer); // Close the file
+    printf("Data saved to file '%s'.\n", filename);
+}
+
+void PokemonList_load_from_csv_file(PokemonList *self, char* filename)
+{
+    printf("Loading from %s\n", filename);
+
     const char delimiter[2] = ",";
     FILE* fp = fopen(filename, "r");
 
@@ -184,160 +311,84 @@ void load_command(char* filename)
         return;
     }
 
-    if (pokemon_db == NULL) {
-        pokemon_db = create_pokemon_db(POKEMONS_INIT_CAPACITY); // create  a new db because is Null
-    } else {
-        clear_pokemon_db(pokemon_db); //clear db before starting to store new records
+    printf("0\n");
+    if (self->count > 0) {
+        printf("Clear %d entries\n", self->count);
+        PokemonList_clear(self); //clear before starting to store new records
     }
 
+    printf("1\n");
     char line[1000];
+    printf("2\n");
     fgets(line, 1000, fp); // skip header line
+    printf("3\n");
 
     while (fgets(line, 1000, fp)) {
-
-        if (pokemon_db->count >= pokemon_db->capacity) {// Need to resize the dynamic list
-
-            printf("DB capacity reached, DB memory will be reallocated, New capacity: %d\n", pokemon_db->capacity * 2);
-            void* temp_ptr = realloc(pokemon_db->pokemons, pokemon_db->capacity * sizeof(Pokemon) * 2);
-
-            if (temp_ptr == NULL) {
-                printf("Error: could not allocate memory for Pokemon DB\n");
-                fclose(fp);
-                return;
-            }
-
-            pokemon_db->capacity *= 2;
-            pokemon_db->pokemons = temp_ptr;
-        }
-
-        char* token = strtok(line, delimiter);
-        pokemon_db->pokemons[pokemon_db->count].id = atoi(token); 
-
-        token = strtok(NULL, delimiter);
-        strcpy(pokemon_db->pokemons[pokemon_db->count].name, token); 
-
-        token = strtok(NULL, delimiter);
-        strcpy(pokemon_db->pokemons[pokemon_db->count].form, token); 
-
-        token = strtok(NULL, delimiter);
-        strcpy(pokemon_db->pokemons[pokemon_db->count].type1, token); 
-
-        token = strtok(NULL, delimiter);
-        strcpy(pokemon_db->pokemons[pokemon_db->count].type2, token); 
-
-        token = strtok(NULL, delimiter);
-        pokemon_db->pokemons[pokemon_db->count].total = atoi(token); 
-
-        token = strtok(NULL, delimiter);
-        pokemon_db->pokemons[pokemon_db->count].hp = atoi(token); 
-
-        token = strtok(NULL, delimiter);
-        pokemon_db->pokemons[pokemon_db->count].attack = atoi(token); 
-
-        token = strtok(NULL, delimiter);
-        pokemon_db->pokemons[pokemon_db->count].defense = atoi(token); 
-
-        token = strtok(NULL, delimiter);
-        pokemon_db->pokemons[pokemon_db->count].sp_atk = atoi(token); 
-
-        token = strtok(NULL, delimiter);
-        pokemon_db->pokemons[pokemon_db->count].sp_def = atoi(token); 
-
-        token = strtok(NULL, delimiter);
-        pokemon_db->pokemons[pokemon_db->count].speed = atoi(token); 
-
-        token = strtok(NULL, delimiter);
-        pokemon_db->pokemons[pokemon_db->count].generation = atoi(token); 
-
-        pokemon_db->count++;
+        printf("%s\n", line);
+        Pokemon* p = Pokemon_new();
+        Pokemon_init_from_str(p, &line);
+        PokemonList_add(self, p);
     }    
 
     fclose(fp);
-    printf("Loaded %d pokemons from file %s\n", pokemon_db->count, filename);
+    printf("Loaded %d pokemons from file %s\n", self->count, filename);
 }
 
-void save_command(char* filename)
-{
-    FILE* fp = fopen(filename, "w"); // Open file for writing
+/***************************************************************************
+* Class PokemonDB
+****************************************************************************/
 
-    if (fp == NULL) {
-        printf("Error: Failed to open file '%s' for writing.\n", filename);
-        return;
+typedef struct PokemonDB PokemonDB;
+
+struct PokemonDB {
+    PokemonList* pokemonList;
+    PokemonList* query_result;
+};
+
+PokemonDB* PokemonDB_new() 
+{
+    PokemonDB* db = malloc(sizeof(PokemonDB));
+    db->pokemonList = PokemonList_new();
+    db->query_result = PokemonList_new();
+    return db;
+}
+
+void PokemonDB_destroy(PokemonDB *self)
+{
+    PokemonList_destroy(self->pokemonList);
+    PokemonList_destroy(self->query_result);
+    free(self);
+}
+
+Pokemon** PokemonDB_find_pokemon_by_field(PokemonDB *self, char* field_name, char* field_value)
+{
+    PokemonList_clear(self->query_result);
+
+    for (int i = 0; i < self->pokemonList->count; i++) {
+        Pokemon* p = self->pokemonList->pokemons[i];
+
+        if (Pokemon_match_stat(p, field_name, field_value)) {
+            self->query_result->pokemons[self->query_result->count] = p;
+            self->query_result->count++;
+        }
     }
 
-    // Write header row
-    fprintf(fp, "\"ID\",\"Name\",\"Form\",\"Type1\",\"Type2\",\"Total\",\"HP\",\"Attack\",\"Defense\",\"Sp. Atk\",\"Sp. Def\",\"Speed\",\"Generation\"\n");
-
-    // Write each matching Pokemon as a row in the CSV file
-    for (int i = 0; i < matching_pokemon_count; i++) {
-        Pokemon* p = matching_pokemons[i];
-        fprintf(fp, "%d,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d\n",
-            p->id, p->name, p->form, p->type1, p->type2, p->total, p->hp, p->attack,
-            p->defense, p->sp_atk, p->sp_def, p->speed, p->generation);
-    }
-
-    fclose(fp); // Close the file
-    printf("Data saved to file '%s'.\n", filename);
+    return self->query_result->pokemons;
 }
 
-void size_command()
-{
-    printf("size: %d\n", pokemon_db->count);
-}
-
-void range_command(int range)
-{
-    printf("Getting range: %d\n\n", range);
-
-    if (range > pokemon_db->count) {
-        range = pokemon_db->count;
-    }
-
-    print_pokemon_table_header();
-    for (int i = 0; i < range; i++) {
-        print_pokemon_as_table_entry(pokemon_db->pokemons[i]);
-    }
-}
-
-void show_command(int id)
-{
-
-    printf("Showing ID: %d\n", id);
-    Pokemon* p = find_pokemon_by_id(id); // search for pokemon with ID
-
-    if (p == NULL) {
-        printf("pokemon with given ID: %d not found", id);
-        return;
-    }
-
-    print_pokemon_as_object(*p);
-}
-
-void print_search_command()
-{
-    printf("Found %d Pokemons:\n", matching_pokemon_count);
-
-    print_pokemon_table_header();
-    for (int i = 0; i < matching_pokemon_count; i++) {
-        print_pokemon_as_table_entry(*matching_pokemons[i]);
-    }
-}
-
-void search_command(char *stat, char *value)
-{
-    printf("Searching for %s with value %s\n", stat, value);
-
-    // call find_pokemon_by_field to search for the matching Pokemon
-    matching_pokemons = find_pokemon_by_field(stat, value, &matching_pokemon_count);
-
-    print_search_command();
-}
+/***************************************************************************
+* Main
+****************************************************************************/
+#define MAX_COMMAND_LENGTH 30
+#define MAX_VALUE_LENGTH 30
 
 int main() {
     char command[MAX_COMMAND_LENGTH]; //create an array of MAX_COMMAND_LENGTH size in memory to store the command string
     char argument[MAX_COMMAND_LENGTH];// same here to store the arguments as strings
     char arg_value[MAX_VALUE_LENGTH]; 
     int argument_int;// should do the same for int values 
+
+    PokemonDB *pokemon_db = PokemonDB_new();
 
     while (1) {
         printf("Enter command: "); //print text requesting user input 
@@ -349,42 +400,43 @@ int main() {
         }
         else if (strcmp(command, "load") == 0) {
             scanf("%s", argument); // look for command's argument as string type
-            load_command(argument);//call load function with argument
+            PokemonList_load_from_csv_file(pokemon_db->pokemonList, argument);
         }
         else if (strcmp(command, "save") == 0) {
             scanf("%s", argument);
-            save_command(argument);
+            PokemonList_save_as_csv(pokemon_db->query_result, argument);
         }
         else if (strcmp(command, "size") == 0) {
-            size_command();
+            printf("size: %d\n", pokemon_db->pokemonList->count);
         }
         else if (strcmp(command, "range") == 0) {
             scanf("%d", &argument_int); // look for command's argument as string type
-            range_command(argument_int); // call range funtion with the int argument
+            PokemonList_print_as_table(pokemon_db->pokemonList, argument_int);
         }
         else if (strcmp(command, "show") == 0) {
             //TODO: add show search
             scanf("%s", argument);
 
             if (strcmp(argument, "search") == 0) {
-                print_search_command();
+                PokemonList_print_as_table(pokemon_db->query_result, -1);
                 continue;
             }
 
-            show_command(atoi(argument));
+            Pokemon** p = PokemonDB_find_pokemon_by_field(pokemon_db, "ID", argument);
+            Pokemon_print_multi_line(*p);
         }
         else if (strcmp(command, "search") == 0) {
             scanf("%s", argument);
             scanf("%s", arg_value);
-            search_command(argument, arg_value);
+            PokemonDB_find_pokemon_by_field(pokemon_db, argument, arg_value);
+            PokemonList_print_as_table(pokemon_db->query_result, -1);
         }
         else {
             printf("Invalid command: %s\n", command);
         }
     }
 
-    destroy_pokemon_db(pokemon_db);
-    free(matching_pokemons);
+    PokemonDB_destroy(pokemon_db);
     return 0;
 }
 
