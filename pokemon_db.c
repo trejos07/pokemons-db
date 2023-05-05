@@ -3,6 +3,8 @@
 #include <string.h>
 #include <stdbool.h>
 
+int quittingProgram = 0;
+
 /***************************************************************************
 * Class Pokemon
 ****************************************************************************/
@@ -414,11 +416,23 @@ struct CommandStack {
 
 CommandStack* CommandStack_new(int history_size)
 {
-    CommandStack* commandList = malloc(sizeof(CommandStack*));
-    commandList->count = 0;
-    commandList->history_size = history_size;
-    commandList->commands = malloc(sizeof(ICommand*)* history_size);
-    return commandList;
+    CommandStack* stack = malloc(sizeof(CommandStack));
+
+    if (stack == NULL) {
+        printf("Error: Failed to allocate memory for CommandStack.\n");
+        return NULL;
+    }
+
+    stack->count = 0;
+    stack->history_size = history_size;
+    stack->commands = calloc(stack->history_size, sizeof(ICommand*));
+
+    if (stack->commands == NULL) {
+        printf("Error: Failed to allocate memory for commands array in CommandStack.\n");
+        return NULL;
+    }
+
+    return stack;
 }
 
 void CommandStack_destroy(CommandStack* self) 
@@ -486,6 +500,12 @@ struct CommandRecorder {
 CommandRecorder* CommandRecorder_new(int history_size)
 {
     CommandRecorder* recorder = malloc(sizeof(CommandRecorder));
+
+    if (recorder == NULL) {
+        printf("Error: Failed to allocate memory for CommandRecorder.\n");
+        return NULL;
+    }
+
     recorder->history_size = history_size;
     recorder->doHistory = CommandStack_new(history_size);
     recorder->undoHistory = CommandStack_new(history_size);
@@ -592,7 +612,7 @@ void CLICommandDataCollection_add(CLICommandDataCollection* self, CLICommandData
     self->commandsCount++;
 }
 
-const CLICommandData* CLICommandDataCollection_find_by_name(CLICommandDataCollection *self, const char* name) 
+CLICommandData* CLICommandDataCollection_find_by_name(CLICommandDataCollection *self, const char* name) 
 {
     for (int i = 0; i < self->commandsCount; i++) {
         if (strcmp(self->commands[i]->name, name) == 0) {
@@ -616,10 +636,28 @@ struct CLIRunner {
 CLIRunner* CLIRunner_new(void* context) 
 {
     CLIRunner* runner = malloc(sizeof(CLIRunner));
+    
+    if (runner == NULL) {
+        printf("Error: Failed to allocate memory for CLIRunner.\n");
+        return NULL;
+    }
+
     runner->commandRecorder = CommandRecorder_new(5);
     runner->knownCommands = CLICommandDataCollection_new();
     runner->context = context;
     return runner;
+}
+
+void CLIRunner_destroy(CLIRunner* runner) 
+{
+    printf("CLIRunner_destroy\n");
+
+    CommandRecorder_destroy(runner->commandRecorder);
+    printf("CommandRecorder_destroy\n");
+    CLICommandDataCollection_destroy(runner->knownCommands);
+    printf("CLICommandDataCollection_destroy\n");
+    free(runner);
+    printf("free\n");
 }
 
 int CLIRunner_execute(CLIRunner *self, char** args, int arg_count)
@@ -636,10 +674,15 @@ int CLIRunner_execute(CLIRunner *self, char** args, int arg_count)
     }
 
     ICommand* command = commandData->get_command(args, arg_count, self->context);
+
+    if (command == NULL) {
+        return 0;
+    }
+
     command->execute(command);
 
     if (commandData->record) {
-        CommandRecorder_record(self->commandRecorder, &command);
+        CommandRecorder_record(self->commandRecorder, command);
     }
 
     return 1;
@@ -657,16 +700,6 @@ struct PokemonDBShowCommand {
     char* toShow;
 };
 
-PokemonDBShowCommand* PokemonDBShowCommand_new(PokemonDB* pokemonDB, char* toShow) 
-{
-    PokemonDBShowCommand* command = malloc(sizeof(PokemonDBShowCommand));
-    command->pokemonDB = pokemonDB;
-    command->toShow = toShow;
-    command->base.execute = PokemonDBShowCommand_execute;
-    command->base.un_execute = PokemonDBShowCommand_un_execute;
-    return command;
-}
-
 void PokemonDBShowCommand_execute(ICommand* command)
 {
     PokemonDBShowCommand* self = (PokemonDBShowCommand*) command;
@@ -682,18 +715,34 @@ void PokemonDBShowCommand_execute(ICommand* command)
 
 void PokemonDBShowCommand_un_execute(ICommand* command)
 {
-    printf("you cant un print a line");
+    printf("undo show command");
+}
+
+PokemonDBShowCommand* PokemonDBShowCommand_new(PokemonDB* pokemonDB, char* toShow) 
+{
+    PokemonDBShowCommand* command = malloc(sizeof(PokemonDBShowCommand));
+    command->pokemonDB = pokemonDB;
+    command->toShow = toShow;
+    command->base.execute = PokemonDBShowCommand_execute;
+    command->base.un_execute = PokemonDBShowCommand_un_execute;
+    return command;
 }
 
 ICommand* PokemonDBShowCommand_from_args(char** args, int arg_count, void* context)
 {
     if (arg_count < 2) {
-        printf("");
-        return;
+        printf("Error: Missing argument. Usage:\n  - show <id>: gets the entry with the given id.\n  - show search: gets the last query results.\n");
+        return NULL;
     }
 
     PokemonDB* db = (PokemonDB*) context;
-    return PokemonDBShowCommand_new(db, args[0]);
+    return &PokemonDBShowCommand_new(db, args[0])->base;
+}
+
+ICommand* PokemonDBExitCommand_from_args(char** args, int arg_count, void* context)
+{
+    quittingProgram = 1;
+    return NULL;
 }
 
 /***************************************************************************
@@ -753,32 +802,39 @@ int parse_line(char *line, int max_args, char *argv[]) {
     return argc;
 }
 
-void Test()
+void print_args(char** args, int argc)
 {
+    printf("argc = %d\n", argc);
+    for (int i = 0; i < argc; i++) {
+        printf("args[%d] = %s\n", i, args[i]);
+    }
+}
+
+/***************************************************************************
+* Main
+****************************************************************************/
+
+int main() {
+
     PokemonDB *pokemon_db = PokemonDB_new();
     CLIRunner* runner = CLIRunner_new(pokemon_db);
 
-    CLICommandList_add(runner->knownCommands, CLICommandData_new("show", "Show a pokemon with the specified ID", 0, PokemonDBShowCommand_from_args));
+    CLICommandDataCollection_add(runner->knownCommands, CLICommandData_new("exit", "quit the program", 0, PokemonDBExitCommand_from_args));
+    CLICommandDataCollection_add(runner->knownCommands, CLICommandData_new("show", "Show a pokemon with the specified ID", 0, PokemonDBShowCommand_from_args));
 
     char line[1024];
     char *argv[MAX_ARGS];
     int argc;
 
-    while (1) {
+    while (!quittingProgram) {
         printf("Enter command: "); //print text requesting user input 
 
         if (fgets(line, sizeof(line), stdin) == NULL) { // if no input just continue waiting
             continue;
         }
 
-        // Parse the line into argc/argv
-        argc = parse_line(line, MAX_ARGS, argv);
-
-        // Print the arguments
-        printf("argc = %d\n", argc);
-        for (int i = 0; i < argc; i++) {
-            printf("argv[%d] = %s\n", i, argv[i]);
-        }
+        argc = parse_line(line, MAX_ARGS, argv); // Parse the line into argc/argv
+        print_args(argv, argc); // Print the arguments
 
         CLIRunner_execute(runner, argv, argc);
     }
@@ -788,13 +844,7 @@ void Test()
         free(argv[i]);
     }
 
+    CLIRunner_destroy(runner);
     PokemonDB_destroy(pokemon_db);
-}
-
-/***************************************************************************
-* Main
-****************************************************************************/
-
-int main(int argc, char *argv[]) {
-    Test();
+    return 0;
 }
