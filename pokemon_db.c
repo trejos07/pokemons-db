@@ -402,7 +402,7 @@ typedef struct PokemonDBOperation PokemonDBOperation;
 struct PokemonDBOperation {
     ICommandOperation base;
     PokemonDB *pokemon_db;
-    void (*execute_implementation)(PokemonDBOperation *, PokemonDB *);
+    void (*execute_implementation)(PokemonDBOperation *);
 };
 
 void PokemonDBOperation_execute(ICommandOperation *operation)
@@ -414,10 +414,10 @@ void PokemonDBOperation_execute(ICommandOperation *operation)
         return;
     }
 
-    self->execute_implementation(self, self->pokemon_db);
+    self->execute_implementation(self);
 }
 
-PokemonDBOperation* PokemonDBOperation_new(PokemonDB *pokemon_db, void (*execute_implementation)(PokemonDBOperation *, PokemonDB *))
+PokemonDBOperation* PokemonDBOperation_new(PokemonDB *pokemon_db, void (*execute_implementation)(PokemonDBOperation *))
 {
     PokemonDBOperation* operation = malloc(sizeof(PokemonDBOperation*));
     operation->pokemon_db = pokemon_db;
@@ -433,7 +433,6 @@ typedef struct ICommand ICommand;
 struct ICommand {
     void (*execute)(ICommand *);
     void (*un_execute)(ICommand *);
-    void (*destroy)(ICommand *);
 };
 
 void ICommand_execute(ICommand *self)
@@ -482,7 +481,6 @@ BaseCommand* BaseCommand_new(ICommandOperation* execute_operation, ICommandOpera
     BaseCommand* command = malloc(sizeof(BaseCommand*));
     command->base.execute = BaseCommand_execute;
     command->base.execute = BaseCommand_un_execute;
-    command->base.destroy = (void(*)(ICommand*))BaseCommand_destroy;
     command->execute_operation = execute_operation;
     command->un_execute_operation = un_execute_operation;
     return command;
@@ -504,34 +502,33 @@ CommandStack* CommandStack_new(int history_size)
 {
     CommandStack* commandList = malloc(sizeof(CommandStack*));
     commandList->count = 0;
-    commandList->history_size = 0;
+    commandList->history_size = history_size;
     commandList->commands = malloc(sizeof(ICommand*)* history_size);
     return commandList;
 }
 
 void CommandStack_destroy(CommandStack* self) 
 {
-    for (int i = 0; i < self->count; i++) {
-        self->commands[i]->destroy(self->commands[i]);
-    }
-
     free(self->commands);
     free(self);
 }
 
 void CommandStack_push(CommandStack* self, ICommand * command)
 {
-    if (self->count >= self->history_size) {
-        self->commands[0] = NULL;
-    }
+    char overflow = self->count >= self->history_size;
 
-    // Shift the elements to the left to fill the gap
-    for (int i = 0; i < self->count - 1; i++) {
-        self->commands[i] = self->commands[i+1];
+    if (overflow) {
+        // Shift the elements to the left to make a gap at the end the new element
+        for (int i = 0; i < self->count - 1; i++) {
+            self->commands[i] = self->commands[i+1];
+        }
     }
 
     self->commands[self->count] = command;
-    self->count++;
+
+    if (!overflow) {
+        self->count++;
+    }
 }
 
 ICommand* CommandStack_peak(CommandStack* self)
@@ -541,6 +538,10 @@ ICommand* CommandStack_peak(CommandStack* self)
 
 ICommand* CommandStack_pop(CommandStack* self)
 {
+    if (self->count == 0) {
+        return NULL;
+    }
+
     ICommand* last = self->commands[self->count - 1];
     self->commands[self->count - 1] = NULL;
     self->count--;
@@ -618,17 +619,211 @@ void CommandRecorder_undo(CommandRecorder* self, int undo_count)
 }
 
 /***************************************************************************
-* CLIRunner
+* CLICommand
+****************************************************************************/
+typedef struct CLICommandData CLICommandData;
+
+struct CLICommandData {
+    int record;
+    const char* name;
+    const char* help_text;
+
+    ICommand* (*get_command)(char** args, int arg_count, void* context);
+};
+
+CLICommandData* CLICommandData_new(char* name, char* help_text, int record) 
+{
+    CLICommandData* command = malloc(sizeof(CLICommandData));
+    command->name = name;
+    command->help_text = help_text;
+    command->record = record;
+    return command;
+}
+
+/***************************************************************************
+* CLICommandDataList
 ****************************************************************************/
 
+#define COMMAND_LIST_CAPACITY 32
+
+typedef struct CLICommandDataList CLICommandDataList;
+
+struct CLICommandDataList {
+    CLICommandData** commands;
+    int commandsCount;
+};
+
+CLICommandDataList* CLICommandDataList_new() 
+{
+    CLICommandDataList* list = malloc(sizeof(CLICommandDataList));
+    list->commandsCount = 0;
+    list->commands = malloc(sizeof(CLICommandData*) * COMMAND_LIST_CAPACITY);
+    return list;
+}
+
+void CLICommandDataList_destroy(CLICommandDataList* self) 
+{
+    free(self->commands);
+    free(self);
+}
+
+void CLICommandDataList_add(CLICommandDataList* self, CLICommandData* command)
+{
+    if (self->commandsCount >= COMMAND_LIST_CAPACITY) {
+        return;
+    }
+    
+    self->commands[self->commandsCount] = command;
+    self->commandsCount++;
+}
+
+const CLICommandData* CLICommandDataList_find_by_name(CLICommandDataList *self, const char* name) 
+{
+    for (int i = 0; i < self->commandsCount; i++) {
+        if (strcmp(self->commands[i]->name, name) == 0) {
+            return self->commands[i];
+        }
+    }
+    return NULL;
+}
+
+/***************************************************************************
+* CLIRunner
+****************************************************************************/
 typedef struct CLIRunner CLIRunner;
 
 struct CLIRunner {
+    CLICommandDataList* knownCommands;
+    CommandRecorder* commandRecorder;
+    void* context;
 };
 
-CLIRunner* CLIRunner_new(int history_size)
+CLIRunner* CLIRunner_new(void* context) 
 {
+    CLIRunner* runner = malloc(sizeof(CLIRunner));
+    runner->commandRecorder = CommandRecorder_new(5);
+    runner->knownCommands = CLICommandDataList_new();
+    runner->context = context;
+    return runner;
 }
+
+int CLIRunner_execute(CLIRunner *self, char** args, int arg_count)
+{
+    if (arg_count == 0) {
+        return;
+    }
+
+    CLICommandData* commandData = CLICommandDataList_find_by_name(self->knownCommands, args[0]);
+
+    if (commandData == NULL) {
+        printf("Error: unknown command '%s'\n", args[0]);
+        return;
+    }
+
+    ICommand* command = commandData->get_command(args, arg_count, self->context);
+    command->execute(command);
+
+    if (commandData->record) {
+        CommandRecorder_record(self->commandRecorder, &command);
+    }
+}
+
+/***************************************************************************
+* PokemonDBShowCommadData
+****************************************************************************/
+typedef struct PokemonDBShowCommadData PokemonDBShowCommadData;
+
+struct PokemonDBShowCommadData {
+    CLICommandData base;
+    PokemonDB* pokemonDB;
+};
+
+
+PokemonDBShowCommadData* PokemonDBShowCommadData_new(PokemonDB* pokemonDB)
+{
+    PokemonDBShowCommadData* command = malloc(sizeof(PokemonDBShowCommadData));
+    command->base.name = "show";
+    command->base.help_text = "Show a pokemon with the specified ID";
+    command->base.record = 0;
+    command->base.get_command = PokemonDBShowCommadData_execute;
+    command->pokemonDB = pokemonDB;
+    return command;
+}
+
+void PokemonDBShowCommadData_execute(char** args, int arg_count, void* contex)
+{
+    PokemonDB* db = (PokemonDB*) contex;
+
+    BaseCommand_new(PokemonDBOperation_new(execute), PokemonDBOperation_new(un_execute));
+
+}
+
+void Test()
+{
+    CLIRunner* runner = CLIRunner_new();
+
+    
+
+    // CLICommandList_add(runner->knownCommands, PokemonDBShowCommadData());
+
+}
+
+
+
+#define MAX_ARGS 10
+#define MAX_ARG_LEN 256
+
+int parse_line(char *line, int max_args, char *argv[]) {
+    int argc = 0; //args count
+    char arg[MAX_ARG_LEN]; //arg
+    char *p = line;
+    char *q = arg;
+    int in_quote = 0;
+    int in_escape = 0;
+
+    // Parse the input string
+    while (*p != '\0' && argc < max_args) {
+        if (*p == '\\' && !in_escape) {
+            // Handle escape sequence
+            in_escape = 1;
+        } else if (*p == '"' && !in_escape) {
+            // Handle quoted string
+            in_quote = !in_quote;
+        } else if ((*p == ' ' || *p == '\t' || *p == '\n') && !in_quote) {
+            // End of argument
+            if (q > arg) {
+                // Add the argument to argv
+                *q = '\0';
+                argv[argc] = strdup(arg);
+                argc++;
+                q = arg;
+            }
+        } else {
+            // Add character to argument
+            *q = *p;
+            q++;
+        }
+
+        // Reset escape sequence flag
+        in_escape = 0;
+
+        // Move to the next character
+        p++;
+    }
+
+    // Add the last argument, if any
+    if (q > arg) {
+        *q = '\0';
+        argv[argc] = strdup(arg);
+        argc++;
+    }
+
+    // Add a NULL terminator at the end of the argv array
+    argv[argc] = NULL;
+
+    return argc;
+}
+
 
 
 /***************************************************************************
@@ -712,4 +907,3 @@ int main(int argc, char *argv[]) {
     PokemonDB_destroy(pokemon_db);
     return 0;
 }
-
