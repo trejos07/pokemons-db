@@ -650,14 +650,9 @@ CLIRunner* CLIRunner_new(void* context)
 
 void CLIRunner_destroy(CLIRunner* runner) 
 {
-    printf("CLIRunner_destroy\n");
-
     CommandRecorder_destroy(runner->commandRecorder);
-    printf("CommandRecorder_destroy\n");
     CLICommandDataCollection_destroy(runner->knownCommands);
-    printf("CLICommandDataCollection_destroy\n");
     free(runner);
-    printf("free\n");
 }
 
 int CLIRunner_execute(CLIRunner *self, char** args, int arg_count)
