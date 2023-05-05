@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 /***************************************************************************
 * Class Pokemon
@@ -73,23 +74,21 @@ void Pokemon_init(Pokemon *self, int id, const char* name, const char* form, con
 void Pokemon_init_from_str(Pokemon *self, char* str)
 {
     const char delimiter[2] = ",";
+    int id = atoi(strtok(str, delimiter));
+    char* name = strtok(NULL, delimiter);
+    char* form = strtok(NULL, delimiter);
+    char* type1 = strtok(NULL, delimiter);
+    char* type2 = strtok(NULL, delimiter);
+    int total = atoi(strtok(NULL, delimiter));
+    int hp = atoi(strtok(NULL, delimiter));
+    int attack = atoi(strtok(NULL, delimiter));
+    int defense = atoi(strtok(NULL, delimiter));
+    int sp_atk = atoi(strtok(NULL, delimiter));
+    int sp_def = atoi(strtok(NULL, delimiter));
+    int speed = atoi(strtok(NULL, delimiter));
+    int gen = atoi(strtok(NULL, delimiter));
 
-    Pokemon_init(
-        self, 
-        atoi(strtok(str, delimiter)), //id
-        strtok(NULL, delimiter), //name
-        strtok(NULL, delimiter), //form
-        strtok(NULL, delimiter), //type1
-        strtok(NULL, delimiter), //type2
-        atoi(strtok(NULL, delimiter)), //total
-        atoi(strtok(NULL, delimiter)), //hp
-        atoi(strtok(NULL, delimiter)), //attack
-        atoi(strtok(NULL, delimiter)), //defense
-        atoi(strtok(NULL, delimiter)), //sp_atk
-        atoi(strtok(NULL, delimiter)), //sp_def
-        atoi(strtok(NULL, delimiter)), //speed
-        atoi(strtok(NULL, delimiter)) //gen
-    );
+    Pokemon_init(self, id, name, form, type1, type2, total, hp, attack, defense, sp_atk, sp_def, speed, gen);
 }
 
 // Destructor (without deallocation)
@@ -148,7 +147,7 @@ void Pokemon_print_one_line(Pokemon *self)
 
 void Pokemon_to_string_csv(Pokemon *self, FILE *buffer)
 {
-    snprintf(buffer, sizeof buffer, "%d,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d\n",self->id, self->name, self->form, self->type1, self->type2, self->total, self->hp, self->attack, self->defense, self->sp_atk, self->sp_def, self->speed, self->generation);
+    fprintf(buffer, "%d,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d\n",self->id, self->name, self->form, self->type1, self->type2, self->total, self->hp, self->attack, self->defense, self->sp_atk, self->sp_def, self->speed, self->generation);
 }
 
 int Pokemon_match_stat(Pokemon *self, char *field_name, char *field_value)
@@ -192,7 +191,7 @@ int Pokemon_match_stat(Pokemon *self, char *field_name, char *field_value)
 typedef struct PokemonList PokemonList;
 
 struct PokemonList {
-    Pokemon** pokemons;  // Dynamic array of Pokemon
+    Pokemon** pokemons;  // Dynamic array of pointers to Pokemons
     int count;          // Number of Pokemon in the database
     int capacity;       // Current capacity of the dynamic array
 };
@@ -202,7 +201,7 @@ PokemonList* PokemonList_new()
     PokemonList* list = malloc(sizeof(PokemonList));
     list->count = 0;
     list->capacity = POKEMONS_LIST_INIT_CAPACITY;
-    list->pokemons = malloc(sizeof(Pokemon) * list->capacity);
+    list->pokemons = malloc(sizeof(Pokemon*) * list->capacity);
     return list;
 }
 
@@ -220,7 +219,7 @@ void PokemonList_add(PokemonList* self, Pokemon *pokemon)
     if (self->count == self->capacity) {
         // If the list is full, resize the dynamic array
         self->capacity *= 2;
-        self->pokemons = realloc(self->pokemons, sizeof(Pokemon) * self->capacity);
+        self->pokemons = realloc(self->pokemons, sizeof(Pokemon*) * self->capacity);
     }
     
     // Add the Pokemon to the list and increment the count
@@ -228,15 +227,18 @@ void PokemonList_add(PokemonList* self, Pokemon *pokemon)
     self->count++;
 }
 
-void PokemonList_remove(PokemonList* self, int index) 
+void PokemonList_remove(PokemonList* self, int index, bool clear_pokemon_memory) 
 {
     // Check if the index is out of bounds
     if (index >= self->count || index < 0) {
         return;
     }
 
-    // Free the memory allocated for the Pokemon
-    Pokemon_reset(self->pokemons[index]); 
+    // clear the memory allocated for the Pokemon and the pointer
+    if (clear_pokemon_memory) {
+        Pokemon_reset(self->pokemons[index]);
+    }
+    self->pokemons[index] = NULL;
 
     // Shift the elements to the left to fill the gap
     for (int i = index; i < self->count - 1; i++) {
@@ -245,15 +247,23 @@ void PokemonList_remove(PokemonList* self, int index)
 
     // Clear the memory of the last element
     // Decrement the count
-    Pokemon_reset(self->pokemons[self->count - 1]); 
+    if (clear_pokemon_memory) {
+        Pokemon_reset(self->pokemons[self->count - 1]);
+    }
+    self->pokemons[self->count - 1] = NULL;
     self->count--; 
 }
 
-void PokemonList_clear(PokemonList *self)
+// Clears each pointer to each pokemon entry,  we don't want reference those pokemons anymore, also resets the count.
+// The clear_pokemon_memory argument sets the memory to the default values for each pokemon.
+// The memory for the pointer array and each pokemon data is still allocated.
+void PokemonList_clear(PokemonList *self, bool clear_pokemon_memory)
 {
-    // Clear the memory of each pokemon entry, memory is still reserved 
     for (int i = 0; i < self->count; i++) {
-        Pokemon_reset(self->pokemons[i]);
+        if (clear_pokemon_memory) {
+            Pokemon_reset(self->pokemons[i]);
+        }
+        self->pokemons[i] = NULL;
     }
 
     // Reset the count
@@ -301,8 +311,6 @@ void PokemonList_save_as_csv(PokemonList *self, char* filename)
 
 void PokemonList_load_from_csv_file(PokemonList *self, char* filename)
 {
-    printf("Loading from %s\n", filename);
-
     const char delimiter[2] = ",";
     FILE* fp = fopen(filename, "r");
 
@@ -311,25 +319,20 @@ void PokemonList_load_from_csv_file(PokemonList *self, char* filename)
         return;
     }
 
-    printf("0\n");
     if (self->count > 0) {
-        printf("Clear %d entries\n", self->count);
-        PokemonList_clear(self); //clear before starting to store new records
+        PokemonList_clear(self, true); //clear before starting to store new records
     }
 
-    printf("1\n");
-    char line[1000];
-    printf("2\n");
+    char* line = malloc(sizeof(char) * 1000);
     fgets(line, 1000, fp); // skip header line
-    printf("3\n");
 
     while (fgets(line, 1000, fp)) {
-        printf("%s\n", line);
         Pokemon* p = Pokemon_new();
-        Pokemon_init_from_str(p, &line);
+        Pokemon_init_from_str(p, line);
         PokemonList_add(self, p);
     }    
 
+    free(line);
     fclose(fp);
     printf("Loaded %d pokemons from file %s\n", self->count, filename);
 }
@@ -362,7 +365,7 @@ void PokemonDB_destroy(PokemonDB *self)
 
 Pokemon** PokemonDB_find_pokemon_by_field(PokemonDB *self, char* field_name, char* field_value)
 {
-    PokemonList_clear(self->query_result);
+    PokemonList_clear(self->query_result, false);
 
     for (int i = 0; i < self->pokemonList->count; i++) {
         Pokemon* p = self->pokemonList->pokemons[i];
