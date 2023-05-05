@@ -1,9 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
-
-int quittingProgram = 0;
 
 /***************************************************************************
 * Class Pokemon
@@ -229,7 +226,7 @@ void PokemonList_add(PokemonList* self, Pokemon *pokemon)
     self->count++;
 }
 
-void PokemonList_remove(PokemonList* self, int index, bool clear_pokemon_memory) 
+void PokemonList_remove(PokemonList* self, int index, int clear_pokemon_memory) 
 {
     // Check if the index is out of bounds
     if (index >= self->count || index < 0) {
@@ -259,7 +256,7 @@ void PokemonList_remove(PokemonList* self, int index, bool clear_pokemon_memory)
 // Clears each pointer to each pokemon entry,  we don't want reference those pokemons anymore, also resets the count.
 // The clear_pokemon_memory argument sets the memory to the default values for each pokemon.
 // The memory for the pointer array and each pokemon data is still allocated.
-void PokemonList_clear(PokemonList *self, bool clear_pokemon_memory)
+void PokemonList_clear(PokemonList *self, int clear_pokemon_memory)
 {
     for (int i = 0; i < self->count; i++) {
         if (clear_pokemon_memory) {
@@ -322,7 +319,7 @@ void PokemonList_load_from_csv_file(PokemonList *self, char* filename)
     }
 
     if (self->count > 0) {
-        PokemonList_clear(self, true); //clear before starting to store new records
+        PokemonList_clear(self, 1); //clear before starting to store new records
     }
 
     char* line = malloc(sizeof(char) * 1000);
@@ -367,7 +364,7 @@ void PokemonDB_destroy(PokemonDB *self)
 
 Pokemon** PokemonDB_find_pokemon_by_field(PokemonDB *self, char* field_name, char* field_value)
 {
-    PokemonList_clear(self->query_result, false);
+    PokemonList_clear(self->query_result, 0);
 
     for (int i = 0; i < self->pokemonList->count; i++) {
         Pokemon* p = self->pokemonList->pokemons[i];
@@ -625,12 +622,18 @@ CLICommandData* CLICommandDataCollection_find_by_name(CLICommandDataCollection *
 /***************************************************************************
 * CLIRunner
 ****************************************************************************/
+#define MAX_ARGS 10
+#define MAX_ARG_LEN 256
+
 typedef struct CLIRunner CLIRunner;
 
 struct CLIRunner {
     CLICommandDataCollection* knownCommands;
     CommandRecorder* commandRecorder;
     void* context;
+    char* prompt;
+    int listening;
+
 };
 
 CLIRunner* CLIRunner_new(void* context) 
@@ -682,6 +685,34 @@ int CLIRunner_execute(CLIRunner *self, char** args, int arg_count)
 
     return 1;
 }
+
+int CLIRunner_run(CLIRunner *self)
+{
+    self->listening = 1;
+
+    char line[1024];
+    char *argv[MAX_ARGS];
+    int argc;
+
+    while (self->listening) {
+        printf("Enter command: "); //print text requesting user input 
+
+        if (fgets(line, sizeof(line), stdin) == NULL) { // if no input just continue waiting
+            continue;
+        }
+
+        argc = parse_line(line, MAX_ARGS, argv); // Parse the line into argc/argv
+        print_args(argv, argc); // Print the arguments
+
+        CLIRunner_execute(self, argv, argc);
+    }
+
+    // Free the memory used by the argv array
+    for (int i = 0; i < argc; i++) {
+        free(argv[i]);
+    }
+}
+
 
 
 /***************************************************************************
@@ -736,15 +767,13 @@ ICommand* PokemonDBShowCommand_from_args(char** args, int arg_count, void* conte
 
 ICommand* PokemonDBExitCommand_from_args(char** args, int arg_count, void* context)
 {
-    quittingProgram = 1;
+    // quittingProgram = 1;
     return NULL;
 }
 
 /***************************************************************************
 * Test
 ****************************************************************************/
-#define MAX_ARGS 10
-#define MAX_ARG_LEN 256
 
 int parse_line(char *line, int max_args, char *argv[]) {
     int argc = 0; //args count
@@ -817,27 +846,27 @@ int main() {
     CLICommandDataCollection_add(runner->knownCommands, CLICommandData_new("exit", "quit the program", 0, PokemonDBExitCommand_from_args));
     CLICommandDataCollection_add(runner->knownCommands, CLICommandData_new("show", "Show a pokemon with the specified ID", 0, PokemonDBShowCommand_from_args));
 
-    char line[1024];
-    char *argv[MAX_ARGS];
-    int argc;
+    // char line[1024];
+    // char *argv[MAX_ARGS];
+    // int argc;
 
-    while (!quittingProgram) {
-        printf("Enter command: "); //print text requesting user input 
+    // while (!quittingProgram) {
+    //     printf("Enter command: "); //print text requesting user input 
 
-        if (fgets(line, sizeof(line), stdin) == NULL) { // if no input just continue waiting
-            continue;
-        }
+    //     if (fgets(line, sizeof(line), stdin) == NULL) { // if no input just continue waiting
+    //         continue;
+    //     }
 
-        argc = parse_line(line, MAX_ARGS, argv); // Parse the line into argc/argv
-        print_args(argv, argc); // Print the arguments
+    //     argc = parse_line(line, MAX_ARGS, argv); // Parse the line into argc/argv
+    //     print_args(argv, argc); // Print the arguments
 
-        CLIRunner_execute(runner, argv, argc);
-    }
+    //     CLIRunner_execute(runner, argv, argc);
+    // }
 
-    // Free the memory used by the argv array
-    for (int i = 0; i < argc; i++) {
-        free(argv[i]);
-    }
+    // // Free the memory used by the argv array
+    // for (int i = 0; i < argc; i++) {
+    //     free(argv[i]);
+    // }
 
     CLIRunner_destroy(runner);
     PokemonDB_destroy(pokemon_db);
