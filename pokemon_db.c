@@ -5,7 +5,7 @@
 #define MAX_COMMAND_LENGTH 20
 #define MAX_VALUE_LENGTH 20
 #define MAX_POKEMONS 2000
-#define MAX_NAME_LEN 200
+#define MAX_NAME_LEN 500
 
 typedef struct {
     int id;
@@ -33,30 +33,45 @@ PokemonDB pokemon_db = {0};
 Pokemon** matching_pokemons = NULL;
 int matching_pokemon_count = 0;
 
-void clear_db(PokemonDB* db)
+void clear_pokemon_db(PokemonDB* db)
 {
     memset(db->pokemons, 0, sizeof(db->pokemons)); //clear the memory reserved by the array 
     db->count = 0; //Reset the count
 }
 
-void print_pokemon(Pokemon p) {
-    //printf("\t| ID: %d | Name: %s | Form: %s |", p.id, p.name, p.form);
-    printf("\tID: %d\n", p.id);
-    printf("\tName: %s\n", p.name);
-    printf("\tForm: %s\n", p.form);
-    printf("\tType 1: %s\n", p.type1);
-    printf("\tType 2: %s\n", p.type2);
-    printf("\tTotal: %d\n", p.total);
-    printf("\tHP: %d\n", p.hp);
-    printf("\tAttack: %d\n", p.attack);
-    printf("\tDefense: %d\n", p.defense);
-    printf("\tSp. Atk: %d\n", p.sp_atk);
-    printf("\tSp. Def: %d\n", p.sp_def);
-    printf("\tSpeed: %d\n", p.speed);
-    printf("\tGeneration: %d\n", p.generation);
+void print_pokemon_table_header()
+{
+    printf("| %-4s | %-20s | %-24s | %-10s | %-10s | %-5s | %-4s | %-6s | %-7s | %-7s | %-7s | %-5s | %-3s |\n", "ID","Name","Form","Type 1","Type 2","Total","HP","Attack","Defense","Sp. Atk","Sp. Def","Speed","Gen");
+    printf("--------------------------------------------------------------------------------------------------------------------------------------------------------\n");
 }
 
-Pokemon* find_pokemon_by_id(int id) {
+void print_pokemon_as_table_entry(Pokemon p)
+{
+    printf("| %-4d | %-20s | %-24s | %-10s | %-10s | %5d | %4d | %6d | %7d | %7d | %7d | %5d | %3d |\n",
+             p.id, p.name, p.form, p.type1, p.type2, p.total, p.hp, p.attack, p.defense, p.sp_atk, p.sp_def, p.speed, p.generation);
+}
+
+void print_pokemon_as_object(Pokemon p)
+{
+    printf("-----------------------\n");
+    printf("| ID: %16d|\n", p.id);
+    printf("| Name: %14s|\n", p.name);
+    printf("| Form: %14s|\n", p.form);
+    printf("| Type 1: %12s|\n", p.type1);
+    printf("| Type 2: %12s|\n", p.type2);
+    printf("| Total: %13d|\n", p.total);
+    printf("| HP: %16d|\n", p.hp);
+    printf("| Attack: %12d|\n", p.attack);
+    printf("| Defense: %11d|\n", p.defense);
+    printf("| Sp. Atk: %11d|\n", p.sp_atk);
+    printf("| Sp. Def: %11d|\n", p.sp_def);
+    printf("| Speed: %13d|\n", p.speed);
+    printf("| Generation: %8d|\n", p.generation);
+    printf("-----------------------\n");
+}
+
+Pokemon* find_pokemon_by_id(int id)
+{
     for (int i = 0; i < pokemon_db.count; i++) {
         if (pokemon_db.pokemons[i].id == id) {
             return &pokemon_db.pokemons[i];
@@ -66,7 +81,8 @@ Pokemon* find_pokemon_by_id(int id) {
     return NULL;
 }
 
-Pokemon** find_pokemon_by_field(char* field_name, char* field_value, int* count) {
+Pokemon** find_pokemon_by_field(char* field_name, char* field_value, int* count)
+{
     Pokemon** matching_pokemons = (Pokemon**)malloc(pokemon_db.count * sizeof(Pokemon*));
     *count = 0;
     for (int i = 0; i < pokemon_db.count; i++) {
@@ -128,7 +144,7 @@ void load_command(char* filename)
     char line[1000];
     fgets(line, 1000, fp); // skip header line
 
-    clear_db(&pokemon_db); //clear db before starting to store new records
+    clear_pokemon_db(&pokemon_db); //clear db before starting to store new records
 
     while (fgets(line, 1000, fp)) {
 
@@ -183,25 +199,51 @@ void load_command(char* filename)
     printf("Loaded %d pokemons from file %s\n", pokemon_db.count, filename);
 }
 
-void size_command() {
+void save_command(char* filename)
+{
+    FILE* fp = fopen(filename, "w"); // Open file for writing
+
+    if (fp == NULL) {
+        printf("Error: Failed to open file '%s' for writing.\n", filename);
+        return;
+    }
+
+    // Write header row
+    fprintf(fp, "\"ID\",\"Name\",\"Form\",\"Type1\",\"Type2\",\"Total\",\"HP\",\"Attack\",\"Defense\",\"Sp. Atk\",\"Sp. Def\",\"Speed\",\"Generation\"\n");
+
+    // Write each matching Pokemon as a row in the CSV file
+    for (int i = 0; i < matching_pokemon_count; i++) {
+        Pokemon* p = matching_pokemons[i];
+        fprintf(fp, "%d,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d\n",
+            p->id, p->name, p->form, p->type1, p->type2, p->total, p->hp, p->attack,
+            p->defense, p->sp_atk, p->sp_def, p->speed, p->generation);
+    }
+
+    fclose(fp); // Close the file
+    printf("Data saved to file '%s'.\n", filename);
+}
+
+void size_command()
+{
     printf("size: %d\n", pokemon_db.count);
 }
 
-void range_command(int range) {
+void range_command(int range)
+{
     printf("Getting range: %d\n\n", range);
 
     if (range > pokemon_db.count) {
         range = pokemon_db.count;
     }
 
+    print_pokemon_table_header();
     for (int i = 0; i < range; i++) {
-        printf("Pokemon %d:\n", i+1);
-        print_pokemon(pokemon_db.pokemons[i]);
-        printf("\n");
+        print_pokemon_as_table_entry(pokemon_db.pokemons[i]);
     }
 }
 
-void show_command(int id) {
+void show_command(int id)
+{
 
     printf("Showing ID: %d\n", id);
     Pokemon* p = find_pokemon_by_id(id); // search for pokemon with ID
@@ -211,21 +253,21 @@ void show_command(int id) {
         return;
     }
 
-    printf("Pokemon found!\n");
-    print_pokemon(*p);
+    print_pokemon_as_object(*p);
 }
 
-void print_search_command() {
+void print_search_command()
+{
     printf("Found %d Pokemons:\n", matching_pokemon_count);
 
+    print_pokemon_table_header();
     for (int i = 0; i < matching_pokemon_count; i++) {
-        printf("Pokemon %d:\n", i+1);
-        print_pokemon(*matching_pokemons[i]);
-        printf("\n");
+        print_pokemon_as_table_entry(*matching_pokemons[i]);
     }
 }
 
-void search_command(char *stat, char *value) {
+void search_command(char *stat, char *value)
+{
     printf("Searching for %s with value %s\n", stat, value);
 
     // call find_pokemon_by_field to search for the matching Pokemon
@@ -254,7 +296,7 @@ int main() {
         }
         else if (strcmp(command, "save") == 0) {
             scanf("%s", argument);
-            load_command(argument);
+            save_command(argument);
         }
         else if (strcmp(command, "size") == 0) {
             size_command();
@@ -280,3 +322,4 @@ int main() {
 
     return 0;
 }
+
