@@ -216,7 +216,7 @@ void PokemonList_destroy(PokemonList* self)
 
 void PokemonList_add(PokemonList* self, Pokemon *pokemon)
 {
-    if (self->count == self->capacity) {
+    if (self->count >= self->capacity) {
         // If the list is full, resize the dynamic array
         self->capacity *= 2;
         self->pokemons = realloc(self->pokemons, sizeof(Pokemon*) * self->capacity);
@@ -380,14 +380,281 @@ Pokemon** PokemonDB_find_pokemon_by_field(PokemonDB *self, char* field_name, cha
 }
 
 /***************************************************************************
+* ICommandOperation
+****************************************************************************/
+
+typedef struct ICommandOperation ICommandOperation;
+
+struct ICommandOperation {
+    void (*execute)(ICommandOperation *);
+};
+
+void Execute(ICommandOperation *self){
+    self->execute(self);
+}
+
+/***************************************************************************
+* PokemonDBOperation
+****************************************************************************/
+
+typedef struct PokemonDBOperation PokemonDBOperation;
+
+struct PokemonDBOperation {
+    ICommandOperation base;
+    PokemonDB *pokemon_db;
+    void (*execute_implementation)(PokemonDBOperation *, PokemonDB *);
+};
+
+void PokemonDBOperation_execute(ICommandOperation *operation)
+{
+    PokemonDBOperation *self = (PokemonDBOperation *) operation;
+
+    if (self->execute_implementation == NULL) {
+        printf("missing execute impewmentacion");
+        return;
+    }
+
+    self->execute_implementation(self, self->pokemon_db);
+}
+
+PokemonDBOperation* PokemonDBOperation_new(PokemonDB *pokemon_db, void (*execute_implementation)(PokemonDBOperation *, PokemonDB *))
+{
+    PokemonDBOperation* operation = malloc(sizeof(PokemonDBOperation*));
+    operation->pokemon_db = pokemon_db;
+    operation->base.execute = PokemonDBOperation_execute;
+}
+
+/***************************************************************************
+* ICommand
+****************************************************************************/
+
+typedef struct ICommand ICommand;
+
+struct ICommand {
+    void (*execute)(ICommand *);
+    void (*un_execute)(ICommand *);
+    void (*destroy)(ICommand *);
+};
+
+void ICommand_execute(ICommand *self)
+{
+    self->execute(self);
+}
+
+void ICommand_un_execute(ICommand *self)
+{
+    self->un_execute(self);
+}
+
+/***************************************************************************
+* BaseCommand
+****************************************************************************/
+
+typedef struct BaseCommand BaseCommand;
+
+struct BaseCommand {
+    ICommand base;
+    ICommandOperation* execute_operation;
+    ICommandOperation* un_execute_operation;
+};
+
+void BaseCommand_execute(ICommand *command)
+{
+    BaseCommand *self = (BaseCommand *) command;
+    self->execute_operation->execute(self->execute_operation);
+}
+
+void BaseCommand_un_execute(ICommand *command)
+{
+    BaseCommand *self = (BaseCommand *) command;
+    self->un_execute_operation->execute(self->un_execute_operation);
+}
+
+void BaseCommand_destroy(BaseCommand* command)
+{
+    free(command->execute_operation);
+    free(command->un_execute_operation);
+    free(command);
+}
+
+BaseCommand* BaseCommand_new(ICommandOperation* execute_operation, ICommandOperation* un_execute_operation)
+{
+    BaseCommand* command = malloc(sizeof(BaseCommand*));
+    command->base.execute = BaseCommand_execute;
+    command->base.execute = BaseCommand_un_execute;
+    command->base.destroy = (void(*)(ICommand*))BaseCommand_destroy;
+    command->execute_operation = execute_operation;
+    command->un_execute_operation = un_execute_operation;
+    return command;
+}
+
+/***************************************************************************
+* CommandList
+****************************************************************************/
+
+typedef struct CommandStack CommandStack;
+
+struct CommandStack {
+    ICommand** commands;
+    int history_size;
+    int count;
+};
+
+CommandStack* CommandStack_new(int history_size)
+{
+    CommandStack* commandList = malloc(sizeof(CommandStack*));
+    commandList->count = 0;
+    commandList->history_size = 0;
+    commandList->commands = malloc(sizeof(ICommand*)* history_size);
+    return commandList;
+}
+
+void CommandStack_destroy(CommandStack* self) 
+{
+    for (int i = 0; i < self->count; i++) {
+        self->commands[i]->destroy(self->commands[i]);
+    }
+
+    free(self->commands);
+    free(self);
+}
+
+void CommandStack_push(CommandStack* self, ICommand * command)
+{
+    if (self->count >= self->history_size) {
+        self->commands[0] = NULL;
+    }
+
+    // Shift the elements to the left to fill the gap
+    for (int i = 0; i < self->count - 1; i++) {
+        self->commands[i] = self->commands[i+1];
+    }
+
+    self->commands[self->count] = command;
+    self->count++;
+}
+
+ICommand* CommandStack_peak(CommandStack* self)
+{
+    return self->commands[self->count - 1];
+}
+
+ICommand* CommandStack_pop(CommandStack* self)
+{
+    ICommand* last = self->commands[self->count - 1];
+    self->commands[self->count - 1] = NULL;
+    self->count--;
+    return last;
+}
+
+void CommandStack_clear(CommandStack* self)
+{
+    for (int i = 0; i < self->count; i++) {
+        self->commands[i] = NULL;
+    }
+
+    self->count = 0;
+}
+
+/***************************************************************************
+* CommandRecorder
+****************************************************************************/
+
+typedef struct CommandRecorder CommandRecorder;
+
+struct CommandRecorder {
+    int history_size;
+    CommandStack* doHistory;
+    CommandStack* undoHistory;
+};
+
+CommandRecorder* CommandRecorder_new(int history_size)
+{
+    CommandRecorder* recorder = malloc(sizeof(CommandRecorder));
+    recorder->history_size = history_size;
+    recorder->doHistory = CommandStack_new(history_size);
+    recorder->undoHistory = CommandStack_new(history_size);
+}
+
+void CommandRecorder_destroy(CommandRecorder* self)
+{
+    CommandStack_destroy(self->doHistory);
+    CommandStack_destroy(self->undoHistory);
+    free(self);
+}
+
+void CommandRecorder_record(CommandRecorder* self, ICommand* command)
+{
+    if (self->undoHistory->count > 0) {
+        CommandStack_clear(self->undoHistory);
+    }
+
+    CommandStack_push(self->doHistory, command);
+}
+
+void CommandRecorder_swap_stacks(CommandStack* from, CommandStack* to, int to_move_count, void (*command_move_callback)(ICommand*))
+{
+    for (int i = 0; i < to_move_count; i++) {
+        if (from->count == 0) {
+            break;
+        }
+
+        ICommand* command = CommandStack_peak(from);
+        command_move_callback(command);
+        CommandStack_push(to, command);
+        CommandStack_pop(from);
+    }
+    
+}
+
+void CommandRecorder_redo(CommandRecorder* self, int redo_count)
+{
+    CommandRecorder_swap_stacks(self->undoHistory, self->doHistory, redo_count, ICommand_execute);
+}
+
+void CommandRecorder_undo(CommandRecorder* self, int undo_count)
+{
+    CommandRecorder_swap_stacks(self->doHistory, self->undoHistory, undo_count, ICommand_un_execute);
+}
+
+/***************************************************************************
+* CLIRunner
+****************************************************************************/
+
+typedef struct CLIRunner CLIRunner;
+
+struct CLIRunner {
+};
+
+CLIRunner* CLIRunner_new(int history_size)
+{
+}
+
+
+/***************************************************************************
 * Main
 ****************************************************************************/
 #define MAX_COMMAND_LENGTH 30
 #define MAX_VALUE_LENGTH 30
 
-int main() {
-    char command[MAX_COMMAND_LENGTH]; //create an array of MAX_COMMAND_LENGTH size in memory to store the command string
-    char argument[MAX_COMMAND_LENGTH];// same here to store the arguments as strings
+// int main() {
+
+int main(int argc, char *argv[]) {
+    char buffer[100];
+    char command[MAX_COMMAND_LENGTH];
+    char argument[MAX_COMMAND_LENGTH];
+    int value;
+    
+    // check if interactive mode is enabled
+    int interactive_mode = 0;
+    if (argc == 2 && strcmp(argv[1], "-i") == 0) {
+        interactive_mode = 1;
+        printf("Entering interactive mode...\n");
+        return 0;
+    }
+
+    // char command[MAX_COMMAND_LENGTH]; //create an array of MAX_COMMAND_LENGTH size in memory to store the command string
+    // char argument[MAX_COMMAND_LENGTH];// same here to store the arguments as strings
     char arg_value[MAX_VALUE_LENGTH]; 
     int argument_int;// should do the same for int values 
 
@@ -410,6 +677,9 @@ int main() {
             PokemonList_save_as_csv(pokemon_db->query_result, argument);
         }
         else if (strcmp(command, "size") == 0) {
+            printf("size: %d\n", pokemon_db->pokemonList->count);
+        }
+        else if (strcmp(command, "mkpok") == 0) {
             printf("size: %d\n", pokemon_db->pokemonList->count);
         }
         else if (strcmp(command, "range") == 0) {
