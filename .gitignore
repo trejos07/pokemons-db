@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 
+#Folders
+/[Bb]uild
+
 # Object files
 *.o
 *.ko

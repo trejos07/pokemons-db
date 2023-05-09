@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "cstdio": "c",
+        "commandrecorder.h": "c",
+        "commandstack.h": "c",
+        "clicommanddatacollection.h": "c",
+        "pokemondbshowcommand.h": "c",
+        "pokemondb.h": "c",
+        "icommand.h": "c",
+        "clirunner.h": "c",
+        "clicommanddata.h": "c",
+        "string.h": "c",
+        "stdio.h": "c",
+        "stdlib.h": "c"
+    }
+}
