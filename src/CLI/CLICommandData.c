@@ -1,4 +1,8 @@
 #include <stdlib.h>
+
+#ifndef CLICommandData_C
+#define CLICommandData_C
+
 #include "../Command/ICommand.h"
 #include "CLICommandData.h"
 
@@ -19,3 +23,5 @@ CLICommandData* CLICommandData_new(char* name, char* help_text, int record, ICom
     command->get_command = get_command;
     return command;
 }
+
+#endif

@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef Pokemon_C
+#define Pokemon_C
+
 #include "Pokemon.h"
 
 struct Pokemon
@@ -167,3 +170,5 @@ int Pokemon_match_stat(Pokemon *self, char *field_name, char *field_value)
 
     return 0;
 }
+
+#endif

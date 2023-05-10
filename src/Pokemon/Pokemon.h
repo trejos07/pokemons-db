@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifndef POKEMON_H
+#define POKEMON_H
+
 #define POKEMON_MAX_NAME_LEN 100
 
 typedef struct Pokemon Pokemon;
@@ -15,4 +18,4 @@ void Pokemon_print_one_line(Pokemon *self);
 void Pokemon_to_string_csv(Pokemon *self, FILE *buffer);
 int Pokemon_match_stat(Pokemon *self, char *field_name, char *field_value);
 
-
+#endif

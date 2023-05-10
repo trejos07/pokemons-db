@@ -1,5 +1,8 @@
 #include <stdlib.h>
 
+#ifndef PokemonDBShowCommand_C
+#define PokemonDBShowCommand_C
+
 #include "PokemonDBShowCommand.h"
 #include "../../Command/ICommand.c"
 #include "../PokemonDB.c"
@@ -50,3 +53,5 @@ ICommand* PokemonDBShowCommand_from_args(char** args, int arg_count, void* runne
     PokemonDB* db = (PokemonDB*) runnerp->context;
     return &PokemonDBShowCommand_new(db, args[0])->base;
 }
+
+#endif

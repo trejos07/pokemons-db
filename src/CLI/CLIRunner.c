@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef CLIRunner_C
+#define CLIRunner_C
+
 #include "CLIRunner.h"
 #include "CLICommandData.c"
 #include "CLICommandDataCollection.h"
@@ -179,3 +182,5 @@ ICommand* CLIRunnerExitCommand_from_args(char** args, int arg_count, void* runne
     CLIRunner_stop_listening((CLIRunner*) runner);
     return NULL;
 }
+
+#endif

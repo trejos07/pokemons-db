@@ -11,6 +11,7 @@
         "clicommanddata.h": "c",
         "string.h": "c",
         "stdio.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "pokemon.h": "c"
     }
 }

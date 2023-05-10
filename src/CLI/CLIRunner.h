@@ -1,3 +1,6 @@
+#ifndef CLIRunner_H
+#define CLIRunner_H
+
 #include "./CLICommandDataCollection.h"
 #include "../Command/CommandRecorder.h"
 
@@ -14,3 +17,5 @@ int CLIRunner_listen(CLIRunner *self);
 void CLIRunner_stop_listening(CLIRunner* self);
 
 ICommand* CLIRunnerExitCommand_from_args(char** args, int arg_count, void* runner);
+
+#endif

@@ -1,5 +1,8 @@
 #include <stdlib.h>
 
+#ifndef PokemonList_C
+#define PokemonList_C
+
 #include "PokemonList.h"
 #include "Pokemon.c"
 
@@ -148,3 +151,5 @@ void PokemonList_load_from_csv_file(PokemonList *self, char* filename)
     fclose(fp);
     printf("Loaded %d pokemons from file %s\n", self->count, filename);
 }
+
+#endif

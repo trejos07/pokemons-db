@@ -1,3 +1,6 @@
+#ifndef PokemonList_H
+#define PokemonList_H
+
 #include "Pokemon.h"
 
 #define POKEMONS_LIST_INIT_CAPACITY 100
@@ -16,3 +19,4 @@ void PokemonList_save_as_csv(PokemonList *self, char* filename);
 
 void PokemonList_print_as_table(PokemonList *self, int range);
 
+#endif

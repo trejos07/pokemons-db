@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef CLICommandDataCollection_C
+#define CLICommandDataCollection_C
+
 #include "CLICommandDataCollection.h"
 #include "CLICommandData.c"
 
@@ -42,3 +45,5 @@ CLICommandData* CLICommandDataCollection_find_by_name(CLICommandDataCollection *
     }
     return NULL;
 }
+
+#endif

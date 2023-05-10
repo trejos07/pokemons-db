@@ -1,5 +1,8 @@
 #include <stdlib.h>
 
+#ifndef PokemonDB_C
+#define PokemonDB_C
+
 #include "PokemonDB.h"
 #include "PokemonList.c"
 
@@ -38,3 +41,5 @@ Pokemon** PokemonDB_find_pokemon_by_field(PokemonDB *self, char* field_name, cha
 
     return self->query_result->pokemons;
 }
+
+#endif
